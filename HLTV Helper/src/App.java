@@ -1,10 +1,18 @@
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.By;
 import org.openqa.selenium.Dimension;
 
+import java.util.List;
+import java.util.Scanner;
+
 public class App {
     public static void main(String[] args) throws Exception {
+        
+        Scanner userInput = new Scanner(System.in);
+        System.out.println("Enter the name of the player you wish to view the 10 highest rated matches of.");
+        String playerName = userInput.nextLine();
         
         System.setProperty("webdriver.chrome.driver", "C:\\Java Software\\chromedriver.exe");
         
@@ -15,12 +23,37 @@ public class App {
         
         driver.get("https://www.hltv.org/stats/players"); // navigate to this page and pause execution until page is fully loaded
         driver.findElement(By.id("CybotCookiebotDialogBodyButtonDecline")).click(); // decline cookies
+        Thread.sleep(100); // gives time for site to register choice
         driver.get("https://www.hltv.org/stats/players"); // page refreshes automatically after cookies option chosen, which can cause stale errors - us refreshing the page and waiting for it to complete refresh is a better option than using a Thread.sleep() etc
         
         driver.findElement(By.cssSelector("body > div.navbar > nav > div.navdown > i")).click(); // click settings dropdown toggle to open dropdown
         driver.findElement(By.cssSelector("#popupsettings > div:nth-child(2) > span.right.slider > span.toggleUserTheme.userTheme-night")).click(); // click dark theme - more aesthetically pleasing
         driver.findElement(By.cssSelector("body > div.navbar > nav > div.navdown > i")).click(); // click settings dropdown toggle to close dropdown
         
+        List<WebElement> foundElements = driver.findElements(By.partialLinkText(playerName)); // search for and return every webelement containing a hyperlink with the player's name in. can't just take the first element (using findElement) as a player's name can be contained in another player's name - e.g. nex is contained in nexa, so searching for nex could return nexa's hyperlink element
+
+        String acceptedHyperlink = "";
+
+        for (WebElement i : foundElements) {
+            String hyperlink = i.getAttribute("href"); // grab the hyperlink from the webelement
+            if (hyperlink.length() > 35) { // "https://www.hltv.org/stats/players/" has 35 characters. first of 2 checks to see if the found link is to a player stats page
+                if (hyperlink.substring(0, 35).equals("https://www.hltv.org/stats/players/")) { // second of 2 checks to see if the found link is to a player stats page
+                    String[] hyperlinkSegments = hyperlink.split("/");
+                    if (hyperlinkSegments[hyperlinkSegments.length - 1].equals(playerName.toLowerCase())) { // the ending segment of a HLTV player stats page link is the player's name in lowercase. check if it matches the lowercase version of the player name the user submitted
+                        acceptedHyperlink = hyperlink; // this is the requested player's correct link - the checks ensure that this is e.g. nex's page, not nexa's
+                        break;
+                    }
+                }
+            }
+        }
+        
+        String[] acceptedHyperlinkSegments = acceptedHyperlink.split("/");
+        String playerID = acceptedHyperlinkSegments[5]; // HLTV has an ID for each player, located in this segment of the hyperlink
+        driver.get("https://www.hltv.org/stats/players/matches/" + playerID + "/" + playerName.toLowerCase()); // using the ID we found, access the statistics page for the player's matches
+        
+        // strategy probably now: search for match-lost ratingPositive and match-won ratingPositive, grabbing the contents of the tag, and comparing those contents to each other, then for the top 10 ratings, navigate a few <td>s up to get to the <td> with the link in it, then click it
+        
+        userInput.close();
         driver.manage().window().maximize(); // maximise window - most users would do this once the program is finished, so automating it is a good idea
         System.out.println("Entry finished");
         
